@@ -19,7 +19,7 @@ class DanMuClient(object):
         self.__client       = None
         self.__functionDict = {'default': lambda x: 0}
         self.__isRunning    = False
-        if 'http://' == url[:7]:
+        if 'http://' == url[:7] or 'https://' == url[:8]:
             self.__url = url
         else:
             self.__url = 'http://' + url
@@ -29,7 +29,7 @@ class DanMuClient(object):
                 'zhanqi.tv'         : ZhanQiDanMuClient,
                 'live.bilibili.com' : BilibiliDanMuClient,
                 'huomao.com'        : HuoMaoDanMuClient, }.items() :
-            if re.match(r'^(?:http://)?.*?%s/(.+?)$' % u, url):
+            if re.match(r'^(?:http[s]?://)?.*?%s/(.+?)$' % u, url):
                 self.__baseClient = bc; break
     def __register(self, fn, msgType):
         if fn is None:

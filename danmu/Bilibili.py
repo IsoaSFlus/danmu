@@ -1,5 +1,5 @@
 import socket, json, re, select, time, random
-from struct import pack
+from struct import pack, unpack
 
 import requests
 
@@ -42,17 +42,54 @@ class BilibiliDanMuClient(AbstractDanMuClient):
         def get_danmu(self):
             if not select.select([self.danmuSocket], [], [], 1)[0]: return
             content = self.danmuSocket.pull()
-            for msg in re.findall(b'\x00({[^\x00]*})', content):
+            # print(content)
+            dm_list = []
+            ops = []
+            p = 0
+            while True:
+                if p + 1 >= len(content):
+                    break
+                packetLen, headerLen, ver, op, seq = unpack('!IHHII', content[p:p+16])
+                ops.append(op)
+                p = p + headerLen
+                dm_list.append(content[p:p+packetLen-16])
+                p = p + packetLen - 16
+            # print(ops)
+            # print(dm_list)
+            for i, d in enumerate(dm_list):
                 try:
-                    msg = json.loads(msg.decode('utf8', 'ignore'))
-                    msg['NickName'] = (msg.get('info', ['','',['', '']])[2][1]
-                        or msg.get('data', {}).get('uname', ''))
-                    msg['Content']  = msg.get('info', ['', ''])[1]
-                    msg['MsgType']  = {'SEND_GIFT': 'gift', 'DANMU_MSG': 'danmu',
-                        'WELCOME': 'enter'}.get(msg.get('cmd'), 'other')
+                    msg = {}
+                    if ops[i] == 5:
+                        j = json.loads(d)
+                        msg['NickName'] = (j.get('info', ['','',['', '']])[2][1]
+                                           or j.get('data', {}).get('uname', ''))
+                        msg['Content']  = j.get('info', ['', ''])[1]
+                        msg['MsgType']  = {'SEND_GIFT': 'gift', 'DANMU_MSG': 'danmu',
+                                           'WELCOME': 'enter'}.get(j.get('cmd'), 'other')
+                    else:
+                        # print('other received')
+                        msg = {'NickName': '', 'Content': '', 'MsgType': 'other'}
                 except Exception as e:
+                    # print(e)
                     pass
                 else:
                     self.danmuWaitTime = time.time() + self.maxNoDanMuWait
                     self.msgPipe.append(msg)
+
+
+
+            # for msg in re.findall(b'\x00({[^\x00]*})', content):
+            #     try:
+            #         msg = json.loads(msg.decode('utf8', 'ignore'))
+            #         msg['NickName'] = (msg.get('info', ['','',['', '']])[2][1]
+            #             or msg.get('data', {}).get('uname', ''))
+            #         msg['Content']  = msg.get('info', ['', ''])[1]
+            #         msg['MsgType']  = {'SEND_GIFT': 'gift', 'DANMU_MSG': 'danmu',
+            #             'WELCOME': 'enter'}.get(msg.get('cmd'), 'other')
+            #     except Exception as e:
+            #         pass
+            #     else:
+            #         self.danmuWaitTime = time.time() + self.maxNoDanMuWait
+            #         self.msgPipe.append(msg)
+
         return get_danmu, keep_alive # danmu, heart
