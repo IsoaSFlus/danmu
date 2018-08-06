@@ -1,7 +1,6 @@
 import socket, time, re, json, threading, select, websocket, ssl
 from struct import pack, unpack
 
-import hexdump
 import requests
 
 from .Abstract import AbstractDanMuClient
