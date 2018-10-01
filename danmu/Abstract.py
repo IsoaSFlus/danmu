@@ -1,6 +1,5 @@
 import abc, threading, time, logging, traceback
 
-logger = logging.getLogger('danmu')
 
 # This client will auto-reload if exception is raised inside and write a log
 # it is deprecated once used
@@ -38,7 +37,7 @@ class AbstractDanMuClient(object):
                 self._wrap_thread(danmuThreadFn, heartThreadFn)
                 self._start_receive()
             except Exception as e:
-                logger.debug(traceback.format_exc())
+                logging.debug(traceback.format_exc())
                 time.sleep(5)
             else:
                 break

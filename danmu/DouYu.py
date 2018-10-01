@@ -22,8 +22,10 @@ class _socket(socket.socket):
 
 class DouYuDanMuClient(AbstractDanMuClient):
     def _get_live_status(self):
-        r = requests.get(self.url)
-        roomId = re.search(r'"room_id":(\d+),', r.content.decode('utf-8'))[1]
+        url = 'https://m.douyu.com/%s' % (
+            self.url.split('/')[-1] or self.url.split('/')[-2])
+        r = requests.get(url)
+        roomId = re.search(r'"rid":(\d+),', r.content.decode('utf-8'))[1]
         url = 'http://open.douyucdn.cn/api/RoomApi/room/%s' % roomId
         j = requests.get(url).json()
         if j.get('error') != 0 or j['data'].get('room_status') != '1': return False
