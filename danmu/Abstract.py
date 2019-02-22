@@ -47,7 +47,7 @@ class AbstractDanMuClient(object):
             try:
                 fn(*args, **kwargs)
             except Exception as e:
-                logger.debug(traceback.format_exc())
+                logging.debug(traceback.format_exc())
                 if not self.live: return
                 self.live = False
                 # In case thread is blocked and can't stop, set a max wait time
