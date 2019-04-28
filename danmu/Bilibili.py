@@ -26,6 +26,7 @@ class BilibiliDanMuClient(AbstractDanMuClient):
         self.serverUrl = re.findall(b'<server>(.*?)</server>', r.content)[0].decode('ascii')
         return re.findall(b'<state>(.*?)</state>', r.content)[0] == b'LIVE'
     def _prepare_env(self):
+        self.content = b''
         return (self.serverUrl, 788), {}
     def _init_socket(self, danmu, roomInfo):
         self.danmuSocket = _socket()
@@ -41,19 +42,27 @@ class BilibiliDanMuClient(AbstractDanMuClient):
             time.sleep(30)
         def get_danmu(self):
             if not select.select([self.danmuSocket], [], [], 1)[0]: return
-            content = self.danmuSocket.pull()
-            # print(content)
+            self.content = self.content + self.danmuSocket.pull()
+            # print(self.content)
             dm_list = []
             ops = []
-            p = 0
             while True:
-                if p + 1 >= len(content):
+                try:
+                    packetLen, headerLen, ver, op, seq = unpack('!IHHII', self.content[0:16])
+                except Exception as e:
+                    # print(self.content)
                     break
-                packetLen, headerLen, ver, op, seq = unpack('!IHHII', content[p:p+16])
+
+                if len(self.content) < packetLen:
+                    # print(self.content)
+                    break
                 ops.append(op)
-                p = p + headerLen
-                dm_list.append(content[p:p+packetLen-16])
-                p = p + packetLen - 16
+                dm_list.append(self.content[16:packetLen])
+                if len(self.content) == packetLen:
+                    self.content = b''
+                    break
+                else:
+                    self.content = self.content[packetLen:]
             # print(ops)
             # print(dm_list)
             for i, d in enumerate(dm_list):
