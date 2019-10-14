@@ -22,12 +22,13 @@ class BilibiliDanMuClient(AbstractDanMuClient):
         r = requests.get(url)
         room_json = json.loads(r.content)
         self.roomId = room_json['data']['room_id']
-        r = requests.get('http://live.bilibili.com/api/player?id=cid:' + str(self.roomId))
-        self.serverUrl = re.findall(b'<server>(.*?)</server>', r.content)[0].decode('ascii')
-        return re.findall(b'<state>(.*?)</state>', r.content)[0] == b'LIVE'
+        return True
     def _prepare_env(self):
         self.content = b''
-        return (self.serverUrl, 788), {}
+        r = requests.get('https://api.live.bilibili.com/room/v1/Danmu/getConf?room_id=' + str(self.roomId))
+        room_json = json.loads(r.content)
+        self.serverUrl = room_json['data']['host_server_list'][0]['host']
+        return (self.serverUrl, room_json['data']['host_server_list'][0]['port']), {}
     def _init_socket(self, danmu, roomInfo):
         self.danmuSocket = _socket()
         self.danmuSocket.connect(danmu)
