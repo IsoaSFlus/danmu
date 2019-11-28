@@ -1,18 +1,18 @@
-import socket, json, re, select, time, random
+import socket, json, re, select, time, random, websocket
 from struct import pack, unpack
 
 import requests
 
 from .Abstract import AbstractDanMuClient
 
-class _socket(socket.socket):
+class _socket(websocket.WebSocket):
     def push(self, data, type = 7):
         data = (pack('>i', len(data) + 16) + b'\x00\x10\x00\x01' +
             pack('>i', type) + pack('>i', 1) + data)
-        self.sendall(data)
+        self.send(data)
     def pull(self):
         try: # for socket.settimeout
-            return self.recv(9999)
+            return self.recv()
         except Exception as e:
             return ''
 
@@ -27,23 +27,30 @@ class BilibiliDanMuClient(AbstractDanMuClient):
         self.content = b''
         r = requests.get('https://api.live.bilibili.com/room/v1/Danmu/getConf?room_id=' + str(self.roomId))
         room_json = json.loads(r.content)
-        self.serverUrl = room_json['data']['host_server_list'][0]['host']
-        return (self.serverUrl, room_json['data']['host_server_list'][0]['port']), {}
+        # print(room_json)
+        # self.serverUrl = 'wss://' + room_json['data']['host_server_list'][0]['host'] + '/sub'
+        self.serverUrl = 'wss://broadcastlv.chat.bilibili.com/sub'
+        return (self.serverUrl, room_json['data']['host_server_list'][0]['wss_port']), {}
     def _init_socket(self, danmu, roomInfo):
         self.danmuSocket = _socket()
-        self.danmuSocket.connect(danmu)
+        self.danmuSocket.connect(danmu[0])
         self.danmuSocket.settimeout(3)
         self.danmuSocket.push(data = json.dumps({
             'roomid': int(self.roomId),
             'uid': int(1e14 + 2e14 * random.random()),
+            'protover': 1
             }, separators=(',', ':')).encode('ascii'))
     def _create_thread_fn(self, roomInfo):
         def keep_alive(self):
             self.danmuSocket.push(b'', 2)
-            time.sleep(30)
+            time.sleep(10)
         def get_danmu(self):
-            if not select.select([self.danmuSocket], [], [], 1)[0]: return
-            self.content = self.content + self.danmuSocket.pull()
+            tmp_content = self.danmuSocket.pull()
+            if len(tmp_content) == 0:
+                time.sleep(0.3)
+                return
+
+            self.content = self.content + tmp_content
             # print(self.content)
             dm_list = []
             ops = []
@@ -51,11 +58,9 @@ class BilibiliDanMuClient(AbstractDanMuClient):
                 try:
                     packetLen, headerLen, ver, op, seq = unpack('!IHHII', self.content[0:16])
                 except Exception as e:
-                    # print(self.content)
                     break
 
                 if len(self.content) < packetLen:
-                    # print(self.content)
                     break
                 ops.append(op)
                 dm_list.append(self.content[16:packetLen])
@@ -77,7 +82,7 @@ class BilibiliDanMuClient(AbstractDanMuClient):
                         msg['MsgType']  = {'SEND_GIFT': 'gift', 'DANMU_MSG': 'danmu',
                                            'WELCOME': 'enter'}.get(j.get('cmd'), 'other')
                     else:
-                        # print('other received')
+                        # print(ops[i])
                         msg = {'NickName': '', 'Content': '', 'MsgType': 'other'}
                 except Exception as e:
                     # print(e)
